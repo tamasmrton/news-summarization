@@ -2,7 +2,7 @@
 Unit tests for the NewsExtractor class.
 """
 from datetime import datetime
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import pytest
 from bs4 import BeautifulSoup
