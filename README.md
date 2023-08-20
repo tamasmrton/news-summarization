@@ -1,5 +1,7 @@
 # news-summarization
 
+[![CI pipeline](https://github.com/tamasmrton/news-summarization/actions/workflows/python-app.yaml/badge.svg)](https://github.com/tamasmrton/news-summarization/actions/workflows/python-app.yaml)
+
 The aim of this project is to gather summaries and sentiment scores of news articles from different outlets. It works through looking into sitemaps and searching for specific date patterns to identify articles, then deploys NLP models to gather insights. Lastly, the data is stored in parquet file on S3.
 
 ## Table of Contents
