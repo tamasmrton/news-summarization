@@ -7,6 +7,7 @@ The aim of this project is to gather summaries and sentiment scores of news arti
 - [Introduction](#introduction)
 - [Installation](#installation)
 - [Usage](#usage)
+- [Output](#output)
 
 ## Introduction
 
@@ -45,7 +46,7 @@ Once these variables are defined, you can run the pipeline like this:
 python app.py --base-url"https://example.com" --date="2023-08-20" --date-format="%Y-%m-%d" --summarizer-model="some_source/some_summarization_model" --sentiment-model="some_source/some_sentiment_model"
 ```
 
-## Usage
+## Output
 
 The CLI will upload one `.parquet` file to the specified S3 location with the following format:
 
