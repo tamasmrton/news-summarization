@@ -12,4 +12,5 @@ setup(
             'news-summarization = news-summarization:cli',
         ],
     },
+
 )

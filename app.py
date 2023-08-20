@@ -34,7 +34,7 @@ MAX_OUTPUT_LENGTH = 256
 MIN_OUTPUT_LENGTH = 96
 NUM_POOL_PROCESSES = 6
 
-class Workload:
+class Workload: # pylint: disable=too-many-instance-attributes
     """
     A Workload class representing the process of fetching news articles, summarizing them,
     and saving the summarized data to Amazon S3.

@@ -181,11 +181,3 @@ class NewsExtractor:    # pylint: disable=too-many-instance-attributes
             else:
                 log.exception('No news items to fetch!')
         return links, news_items
-
-
-if __name__ == '__main__':
-    import sys
-    logging.basicConfig(stream=sys.stdout, format='%(asctime)s %(name)s: %(levelname)-4s: %(message)s',
-                        datefmt='%Y-%m-%d %H:%M:%S', level=logging.INFO)
-    test = NewsExtractor(base_url='https://dw.com', date='2023-08-19', date_format='%Y-%m-%d')
-    test.main()
