@@ -32,7 +32,7 @@ log = logging.getLogger(__name__)
 # Global parameters
 MAX_OUTPUT_LENGTH = 256
 MIN_OUTPUT_LENGTH = 96
-NUM_POOL_PROCESSES = 6
+NUM_POOL_PROCESSES = 4
 
 class Workload: # pylint: disable=too-many-instance-attributes
     """
@@ -87,7 +87,7 @@ class Workload: # pylint: disable=too-many-instance-attributes
         Run news text through summarizer and sentiment analyzer models.
 
         :param item: Tuple containing the news text and the link.
-        :return: Dictionary containing the summary, sentiment score and model names.
+        :return: Dictionary containing article, the summary, sentiment score and model names.
         """
         link, news = item
         parsed_link = urlparse(link)
@@ -103,6 +103,7 @@ class Workload: # pylint: disable=too-many-instance-attributes
             return {
                 'source': parsed_link.netloc,
                 'link': link,
+                'article_text': news,
                 'summary': news_summary,
                 'sentiment_label': sentiment_dict['label'],
                 'sentiment_score': sentiment_dict['score'],
@@ -111,7 +112,16 @@ class Workload: # pylint: disable=too-many-instance-attributes
             }
         except IndexError as err:
             log.warning('Too many tokens error in model; err=%s', err)
-            return None
+            return {
+                'source': parsed_link.netloc,
+                'link': link,
+                'article_text': news,
+                'summary': None,
+                'sentiment_label': None,
+                'sentiment_score': None,
+                'sentiment_model': None,
+                'summarization_model': None
+            }
 
     def fetch_news_and_summarize(self,  # pylint: disable=too-many-locals
                                  date_format: str,

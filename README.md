@@ -45,7 +45,7 @@ AWS_REGION=<BUCKET_REGION>
 Once these variables are defined, you can run the pipeline like this:
 
 ```bash
-python app.py --base-url"https://example.com" --date="2023-08-20" --date-format="%Y-%m-%d" --summarizer-model="some_source/some_summarization_model" --sentiment-model="some_source/some_sentiment_model"
+python app.py --base-url="https://example.com" --date="2023-08-20" --date-format="%Y-%m-%d" --summarizer-model="some_source/some_summarization_model" --sentiment-model="some_source/some_sentiment_model"
 ```
 
 ## Output
@@ -61,7 +61,7 @@ s3://my-bucket/2023-08-20/com/example.parquet
 
 The parquet file has the following structure:
 
-| source      | link                                    | summary           | sentiment_label | sentiment_score | sentiment_model | summarization_model |
-| ----------- | --------------------------------------- | ----------------- | --------------- | --------------- | --------------- | ------------------- |
-| example.com | https://example.com/2023/08/20/article2 | Lorem ipsum...    | pos             | 0.95679         | some_sentiment  | some_summarization  |
-| example.com | https://example.com/2023/08/20/article2 | sed do eiusmod... | neu             | 0.45632         | some_sentiment  | some_summarization  |
+| source      | link                                    | article_text   | summary        | sentiment_label | sentiment_score | sentiment_model | summarization_model |
+| ----------- | --------------------------------------- | -------------- | -------------- | --------------- | --------------- | --------------- | ------------------- |
+| example.com | https://example.com/2023/08/20/article2 | Lorem ipsum... | Lorem ipsum... | pos             | 0.95679         | some_sentiment  | some_summarization  |
+| example.com | https://example.com/2023/08/20/article2 | sed do eius... | sed do eius... | neu             | 0.45632         | some_sentiment  | some_summarization  |
