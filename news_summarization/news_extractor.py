@@ -157,10 +157,10 @@ class NewsExtractor:    # pylint: disable=too-many-instance-attributes
         if response:
             news = trafilatura.extract(response, favor_precision=True)
             log.info('News fetched!')
-        else:
+            return news
+        if not response:
             log.exception(
                 'Failed to retrieve text from URL: "%s"', link)
-        return news
 
     def main(self, delay: int = 10) -> tuple:
         """

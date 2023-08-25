@@ -25,8 +25,12 @@ from news_summarization.model_pipeline import ModelPipeline
 load_dotenv()
 
 # Configure logging
-logging.basicConfig(stream=sys.stdout, format='%(asctime)s %(name)s: %(levelname)-4s: %(message)s',
-                    datefmt='%Y-%m-%d %H:%M:%S', level=logging.INFO)
+logging.basicConfig(
+    stream=sys.stdout,
+    format="%(asctime)s %(name)s: %(levelname)-4s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    level=logging.INFO,
+)
 log = logging.getLogger(__name__)
 
 # Global parameters
@@ -34,7 +38,8 @@ MAX_OUTPUT_LENGTH = 256
 MIN_OUTPUT_LENGTH = 96
 NUM_POOL_PROCESSES = 4
 
-class Workload: # pylint: disable=too-many-instance-attributes
+
+class Workload:  # pylint: disable=too-many-instance-attributes
     """
     A Workload class representing the process of fetching news articles, summarizing them,
     and saving the summarized data to Amazon S3.
@@ -52,6 +57,7 @@ class Workload: # pylint: disable=too-many-instance-attributes
         base_url (str): The base URL of the news outlet.
         date (str): The date of news publication.
     """
+
     def __init__(self, base_url: str, date: str):
         """
         Initialize the Workload instance.
@@ -68,7 +74,7 @@ class Workload: # pylint: disable=too-many-instance-attributes
         self.sentiment_analyzer = None
         self.sentiment_model = None
 
-    def _initialize_models(self, summarizer_model_name, sentiment_model_name):
+    def _initialize_models(self, summarizer_model_name: str, sentiment_model_name: str):
         """
         Initialize NLP models.
 
@@ -77,9 +83,11 @@ class Workload: # pylint: disable=too-many-instance-attributes
         """
         self.summarizer_model_name = summarizer_model_name
         self.sentiment_model_name = sentiment_model_name
-        self.summarizer = ModelPipeline(summarizer_model_name, 'summarization')
+        self.summarizer = ModelPipeline(summarizer_model_name, "summarization")
         self.summarizer_model = self.summarizer.fetch_model()
-        self.sentiment_analyzer = ModelPipeline(sentiment_model_name, 'sentiment-analysis')
+        self.sentiment_analyzer = ModelPipeline(
+            sentiment_model_name, "sentiment-analysis"
+        )
         self.sentiment_model = self.sentiment_analyzer.fetch_model()
 
     def _get_summarized_item(self, item: tuple) -> dict:
@@ -93,40 +101,48 @@ class Workload: # pylint: disable=too-many-instance-attributes
         parsed_link = urlparse(link)
         try:
             log.info('Working on "%s"...', parsed_link.path)
-            summary_output = self.summarizer.run_model(model=self.summarizer_model,
-                                                input_text=news,
-                                                min_length=MIN_OUTPUT_LENGTH,
-                                                max_length=MAX_OUTPUT_LENGTH)
-            news_summary = summary_output['summary_text']
-            sentiment_dict = self.sentiment_analyzer.run_model(self.sentiment_model, news_summary)
-
+            summary_output = self.summarizer.run_model(
+                model=self.summarizer_model,
+                input_text=news,
+                min_length=MIN_OUTPUT_LENGTH,
+                max_length=MAX_OUTPUT_LENGTH,
+            )
+            if summary_output:  # pylint: disable=no-else-return
+                news_summary = summary_output["summary_text"]
+                sentiment_dict = self.sentiment_analyzer.run_model(
+                    self.sentiment_model, news_summary
+                )
+                return {
+                    "source": parsed_link.netloc,
+                    "link": link,
+                    "article_text": news,
+                    "summary": news_summary,
+                    "sentiment_label": sentiment_dict["label"],
+                    "sentiment_score": sentiment_dict["score"],
+                    "sentiment_model": self.sentiment_model_name,
+                    "summarization_model": self.summarizer_model_name,
+                }
+            else:
+                raise ValueError("No summary output created")
+        except (IndexError, ValueError) as err:
+            log.warning("Error in running the models; err=%s", err)
             return {
-                'source': parsed_link.netloc,
-                'link': link,
-                'article_text': news,
-                'summary': news_summary,
-                'sentiment_label': sentiment_dict['label'],
-                'sentiment_score': sentiment_dict['score'],
-                'sentiment_model': self.sentiment_model_name,
-                'summarization_model': self.summarizer_model_name
-            }
-        except IndexError as err:
-            log.warning('Too many tokens error in model; err=%s', err)
-            return {
-                'source': parsed_link.netloc,
-                'link': link,
-                'article_text': news,
-                'summary': None,
-                'sentiment_label': None,
-                'sentiment_score': None,
-                'sentiment_model': None,
-                'summarization_model': None
+                "source": parsed_link.netloc,
+                "link": link,
+                "article_text": news,
+                "summary": None,
+                "sentiment_label": None,
+                "sentiment_score": None,
+                "sentiment_model": None,
+                "summarization_model": None,
             }
 
-    def fetch_news_and_summarize(self,  # pylint: disable=too-many-locals
-                                 date_format: str,
-                                 summarizer_model_name: str,
-                                 sentiment_model_name: str) -> list[dict]:
+    def fetch_news_and_summarize(
+        self,  # pylint: disable=too-many-locals
+        date_format: str,
+        summarizer_model_name: str,
+        sentiment_model_name: str,
+    ) -> list[dict]:
         """
         Fetch news, summarize, and analyze sentiment.
 
@@ -139,8 +155,7 @@ class Workload: # pylint: disable=too-many-instance-attributes
 
         news_extractor = NewsExtractor(self.base_url, self.date, date_format)
         links, news_items = news_extractor.main()
-        items = zip(links, news_items
-                    )
+        items = zip(links, news_items)
 
         with Pool(processes=NUM_POOL_PROCESSES) as pool:
             results = pool.map(self._get_summarized_item, items)
@@ -158,24 +173,46 @@ class Workload: # pylint: disable=too-many-instance-attributes
         tld = tldextract.extract(self.base_url)
         s3_path = f's3://{os.getenv("AWS_BUCKET")}/{self.date}/{tld.suffix}/{tld.domain}.parquet'
         wr.s3.to_parquet(summarized_news_df, s3_path)
-        log.info('Data saved to path: %s', s3_path)
+        log.info("Data saved to path: %s", s3_path)
+
 
 @click.command()
-@click.option('--base-url', 'base_url', default=None, type=str,
-              help='The base url of the news outlet.')
-@click.option('--date', default=None, type=str,
-              help='The date of news publication.')
-@click.option('--date-format', 'date_format', default='%Y-%m-%d', type=str,
-              help='Date format, i.e. `%Y-%m-%d`.')
-@click.option('--summarizer-model', 'summarizer_model_name', default=None, type=str,
-              help='Summarizer model name.')
-@click.option('--sentiment-model', 'sentiment_model_name', default=None, type=str,
-              help='Sentiment analyzer model name.')
-def main(base_url: str,
-         date: str,
-         date_format: str,
-         summarizer_model_name: str,
-         sentiment_model_name: str):
+@click.option(
+    "--base-url",
+    "base_url",
+    default=None,
+    type=str,
+    help="The base url of the news outlet.",
+)
+@click.option("--date", default=None, type=str, help="The date of news publication.")
+@click.option(
+    "--date-format",
+    "date_format",
+    default="%Y-%m-%d",
+    type=str,
+    help="Date format, i.e. `%Y-%m-%d`.",
+)
+@click.option(
+    "--summarizer-model",
+    "summarizer_model_name",
+    default=None,
+    type=str,
+    help="Summarizer model name.",
+)
+@click.option(
+    "--sentiment-model",
+    "sentiment_model_name",
+    default=None,
+    type=str,
+    help="Sentiment analyzer model name.",
+)
+def main(
+    base_url: str,
+    date: str,
+    date_format: str,
+    summarizer_model_name: str,
+    sentiment_model_name: str,
+):
     """
     Main entry point for the news summarization and saving process.
 
@@ -186,10 +223,11 @@ def main(base_url: str,
     :param sentiment_model_name: Sentiment analyzer model name.
     """
     workload = Workload(base_url, date)
-    summarized_data = workload.fetch_news_and_summarize(date_format,
-                                                        summarizer_model_name,
-                                                        sentiment_model_name)
+    summarized_data = workload.fetch_news_and_summarize(
+        date_format, summarizer_model_name, sentiment_model_name
+    )
     workload.save_to_s3(summarized_data)
 
-if __name__ == '__main__':
-    main() # pylint: disable=no-value-for-parameter
+
+if __name__ == "__main__":
+    main()  # pylint: disable=no-value-for-parameter
