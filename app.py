@@ -36,7 +36,8 @@ log = logging.getLogger(__name__)
 # Global parameters
 MAX_OUTPUT_LENGTH = 256
 MIN_OUTPUT_LENGTH = 96
-NUM_POOL_PROCESSES = 4
+NUM_POOL_PROCESSES = 2
+DELAY = 5
 
 
 class Workload:  # pylint: disable=too-many-instance-attributes
@@ -154,7 +155,7 @@ class Workload:  # pylint: disable=too-many-instance-attributes
         self._initialize_models(summarizer_model_name, sentiment_model_name)
 
         news_extractor = NewsExtractor(self.base_url, self.date, date_format)
-        links, news_items = news_extractor.main()
+        links, news_items = news_extractor.main(DELAY)
         items = zip(links, news_items)
 
         with Pool(processes=NUM_POOL_PROCESSES) as pool:

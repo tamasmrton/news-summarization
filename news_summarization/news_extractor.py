@@ -43,7 +43,7 @@ class NewsExtractor:  # pylint: disable=too-many-instance-attributes
         :param date: The target date for news extraction in string format.
         :param date_format: The format of the date string.
         """
-        self.base_url = base_url
+        self.base_url = base_url.rstrip("/") if base_url.endswith("/") else base_url
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) \
                          AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36"
