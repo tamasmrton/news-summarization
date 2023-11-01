@@ -52,8 +52,8 @@ class NewsExtractor:  # pylint: disable=too-many-instance-attributes
         self.date_format = date_format
         self.date_formatted = datetime.strptime(date, date_format)
         self.year = str(self.date_formatted.year)
-        self.month = "%02d" % self.date_formatted.month
-        self.day = "%02d" % self.date_formatted.day
+        self.month = f"{self.date_formatted.month:02d}"
+        self.day = f"{self.date_formatted.day:02d}"
 
     def _get_robots(self) -> requests.Response:
         """
