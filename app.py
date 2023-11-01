@@ -17,6 +17,7 @@ import pandas as pd
 import awswrangler as wr
 from dotenv import load_dotenv
 from torch.multiprocessing import Pool
+from torch.cuda import is_available
 
 from news_summarization.news_extractor import NewsExtractor
 from news_summarization.model_pipeline import ModelPipeline
@@ -36,8 +37,9 @@ log = logging.getLogger(__name__)
 # Global parameters
 MAX_OUTPUT_LENGTH = 256
 MIN_OUTPUT_LENGTH = 96
-NUM_POOL_PROCESSES = 2
+NUM_POOL_PROCESSES = 4
 DELAY = 5
+DEVICE = "cuda" if is_available() else "cpu"
 
 
 class Workload:  # pylint: disable=too-many-instance-attributes
@@ -59,7 +61,7 @@ class Workload:  # pylint: disable=too-many-instance-attributes
         date (str): The date of news publication.
     """
 
-    def __init__(self, base_url: str, date: str):
+    def __init__(self, base_url: str, date: str, device: str):
         """
         Initialize the Workload instance.
 
@@ -68,6 +70,7 @@ class Workload:  # pylint: disable=too-many-instance-attributes
         """
         self.base_url = base_url
         self.date = date
+        self.device = device
         self.summarizer_model_name = None
         self.sentiment_model_name = None
         self.summarizer = None
@@ -85,7 +88,7 @@ class Workload:  # pylint: disable=too-many-instance-attributes
         self.summarizer_model_name = summarizer_model_name
         self.sentiment_model_name = sentiment_model_name
         self.summarizer = ModelPipeline(summarizer_model_name, "summarization")
-        self.summarizer_model = self.summarizer.fetch_model()
+        self.summarizer_model = self.summarizer.fetch_model(device=self.device)
         self.sentiment_analyzer = ModelPipeline(
             sentiment_model_name, "sentiment-analysis"
         )
@@ -100,6 +103,16 @@ class Workload:  # pylint: disable=too-many-instance-attributes
         """
         link, news = item
         parsed_link = urlparse(link)
+        summarized_item = {
+            "source": parsed_link.netloc,
+            "link": link,
+            "article_text": news,
+            "summary": None,
+            "sentiment_label": None,
+            "sentiment_score": None,
+            "sentiment_model": None,
+            "summarization_model": None,
+        }
         try:
             log.info('Working on "%s"...', parsed_link.path)
             summary_output = self.summarizer.run_model(
@@ -113,30 +126,26 @@ class Workload:  # pylint: disable=too-many-instance-attributes
                 sentiment_dict = self.sentiment_analyzer.run_model(
                     self.sentiment_model, news_summary
                 )
-                return {
-                    "source": parsed_link.netloc,
-                    "link": link,
-                    "article_text": news,
-                    "summary": news_summary,
-                    "sentiment_label": sentiment_dict["label"],
-                    "sentiment_score": sentiment_dict["score"],
-                    "sentiment_model": self.sentiment_model_name,
-                    "summarization_model": self.summarizer_model_name,
-                }
+                summarized_item.update(
+                    {
+                        "summary": news_summary,
+                        "sentiment_label": sentiment_dict["label"],
+                        "sentiment_score": sentiment_dict["score"],
+                        "sentiment_model": self.sentiment_model_name,
+                        "summarization_model": self.summarizer_model_name,
+                    }
+                )
+                return summarized_item
             else:
                 raise ValueError("No summary output created")
         except (IndexError, ValueError) as err:
             log.warning("Error in running the models; err=%s", err)
-            return {
-                "source": parsed_link.netloc,
-                "link": link,
-                "article_text": news,
-                "summary": None,
-                "sentiment_label": None,
-                "sentiment_score": None,
-                "sentiment_model": None,
-                "summarization_model": None,
-            }
+            return summarized_item
+        except RuntimeError as err:
+            if "CUDA" in str(err):
+                log.warning("Error with CUDA process for running models; err=%s", err)
+                return summarized_item
+            log.error("RuntimeError while running models; err=%s", err)
 
     def fetch_news_and_summarize(
         self,  # pylint: disable=too-many-locals
@@ -173,8 +182,9 @@ class Workload:  # pylint: disable=too-many-instance-attributes
         summarized_news_df = pd.DataFrame.from_dict(summarized_data)
         tld = tldextract.extract(self.base_url)
         s3_path = f's3://{os.getenv("AWS_BUCKET")}/{self.date}/{tld.suffix}/{tld.domain}.parquet'
-        wr.s3.to_parquet(summarized_news_df, s3_path)
-        log.info("Data saved to path: %s", s3_path)
+        if len(summarized_data) > 0:
+            wr.s3.to_parquet(summarized_news_df, s3_path)
+            log.info("Data saved to path: %s", s3_path)
 
 
 @click.command()
@@ -207,12 +217,20 @@ class Workload:  # pylint: disable=too-many-instance-attributes
     type=str,
     help="Sentiment analyzer model name.",
 )
-def main(
+@click.option(
+    "--device",
+    "device",
+    default=DEVICE,
+    type=click.Choice(["cuda", "cpu"]),
+    help="Processing unit; cuda or cpu",
+)
+def main(  # pylint: disable=too-many-arguments
     base_url: str,
     date: str,
     date_format: str,
     summarizer_model_name: str,
     sentiment_model_name: str,
+    device: str,
 ):
     """
     Main entry point for the news summarization and saving process.
@@ -223,7 +241,7 @@ def main(
     :param summarizer_model_name: Summarizer model name.
     :param sentiment_model_name: Sentiment analyzer model name.
     """
-    workload = Workload(base_url, date)
+    workload = Workload(base_url, date, device)
     summarized_data = workload.fetch_news_and_summarize(
         date_format, summarizer_model_name, sentiment_model_name
     )

@@ -8,6 +8,7 @@ from transformers import pipeline
 
 log = logging.getLogger(__name__)
 
+
 class ModelPipeline:
     """
     A utility class for running pretrained pipelines and fetching their outputs.
@@ -22,6 +23,7 @@ class ModelPipeline:
         fetch_model(): Fetches the pretrained model pipeline.
         run_model(classification_model, input_text): Runs analysis on input text.
     """
+
     def __init__(self, model_name: str, task: str):
         """
         Initialize a ModelPipeline instance.
@@ -31,21 +33,22 @@ class ModelPipeline:
         self.model_name = model_name
         self.task = task
 
-    def fetch_model(self) -> pipeline:
+    def fetch_model(self, device: str = "cpu") -> pipeline:
         """
         Fetches the pretrained model pipeline.
 
+        :param device: Use CPU or GPU for processing.
         :return: The fetched model pipeline, or None in case of an error.
         """
-        log.info('Fetching model=%s...', self.model_name)
+        log.info("Fetching model=%s...", self.model_name)
+        log.info("Using %s...", device)
         try:
-            model = pipeline(task=self.task, model=self.model_name)
-            log.info('Fetch succeded!')
+            model = pipeline(task=self.task, model=self.model_name, device=device)
+            log.info("Fetch succeded!")
             return model
         except (OSError, ValueError) as err:
-            log.error('Unknown exception when fetching model; err=%s', err)
+            log.error("Unknown exception when fetching model; err=%s", err)
             return None
-
 
     def run_model(self, model: pipeline, input_text: str, **kwargs) -> dict:
         """
@@ -55,11 +58,11 @@ class ModelPipeline:
         :param input_text: The text to perform text analysis on.
         :return: The text analysis results as a dictionary, or None in case of an error.
         """
-        log.info('Running %s...', self.task.capitalize())
+        log.info("Running %s...", self.task.capitalize())
         try:
             output: dict = model(input_text, **kwargs)[0]
-            log.info('%s complete!', self.task.capitalize())
+            log.info("%s complete!", self.task.capitalize())
             return output
         except (OSError, ValueError) as err:
-            log.error('Unknown exception when running %s; err=%s', self.task, err)
+            log.error("Unknown exception when running %s; err=%s", self.task, err)
             return None
