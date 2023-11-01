@@ -72,9 +72,11 @@ def test_parse_sitemap_with_lastmod(
     """
     soup = BeautifulSoup(MOCK_SITEMAP_CONTENT, "xml")
     links = []
-    links = news_extractor._parse_sitemap_with_lastmod(
-        soup, links
-    )  # pylint: disable=protected-access
+    links = (
+        news_extractor._parse_sitemap_with_lastmod(  # pylint: disable=protected-access
+            soup, links
+        )
+    )
 
     assert len(links) == 1
 
@@ -87,10 +89,9 @@ def test_parse_sitemap_without_lastmod(
     """
     soup = BeautifulSoup(MOCK_SITEMAP_CONTENT, "xml")
     links = []
-    links = news_extractor._parse_sitemap_without_lastmod(
+    links = news_extractor._parse_sitemap_without_lastmod(  # pylint: disable=protected-access
         soup, links
-    )  # pylint: disable=protected-access
-
+    )
     assert len(links) == 2
 
 
