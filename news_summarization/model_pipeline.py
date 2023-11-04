@@ -40,7 +40,8 @@ class ModelPipeline:
 
         :param splitted_text: A list of elements.
         :type splitted_text: list
-        :return: The index of the middle element in the list. If the list has an even number of elements,
+        :return: The index of the middle element in the list.
+                 If the list has an even number of elements,
                  this will be the index of the first element in the right half of the list.
         """
         length = len(splitted_text)
