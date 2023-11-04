@@ -94,6 +94,36 @@ class Workload:  # pylint: disable=too-many-instance-attributes
         )
         self.sentiment_model = self.sentiment_analyzer.fetch_model()
 
+    def _summarize_news(self, news: str) -> str:
+        """
+        Checks the length of the news item. If the token count reaches model limit,
+        it splits the news into pieces and runs summarizer model on it.
+        Lastly, it joins the result in a summary string output.
+
+        :param news: News text to be summarized
+        :return: Summarized text
+        """
+        news_split = self.summarizer.split_input_text(
+            model=self.summarizer_model, input_text=news
+        )
+        summaries = []
+        for news_item in news_split:
+            summary_output = self.summarizer.run_model(
+                model=self.summarizer_model,
+                input_text=news_item,
+                min_length=MIN_OUTPUT_LENGTH,
+                max_length=MAX_OUTPUT_LENGTH,
+            )
+
+            if summary_output:
+                summaries.append(summary_output["summary_text"])
+
+        if not summaries:
+            raise ValueError("No summary output created")
+
+        news_summary = ("\n").join(summaries) if len(summaries) > 1 else summaries[0]
+        return news_summary
+
     def _get_summarized_item(self, item: tuple) -> dict:
         """
         Run news text through summarizer and sentiment analyzer models.
@@ -115,37 +145,29 @@ class Workload:  # pylint: disable=too-many-instance-attributes
         }
         try:
             log.info('Working on "%s"...', parsed_link.path)
-            summary_output = self.summarizer.run_model(
-                model=self.summarizer_model,
-                input_text=news,
-                min_length=MIN_OUTPUT_LENGTH,
-                max_length=MAX_OUTPUT_LENGTH,
+            news_summary = self._summarize_news(news=news)
+
+            sentiment_dict = self.sentiment_analyzer.run_model(
+                self.sentiment_model, news_summary
             )
-            if summary_output:  # pylint: disable=no-else-return
-                news_summary = summary_output["summary_text"]
-                sentiment_dict = self.sentiment_analyzer.run_model(
-                    self.sentiment_model, news_summary
-                )
-                summarized_item.update(
-                    {
-                        "summary": news_summary,
-                        "sentiment_label": sentiment_dict["label"],
-                        "sentiment_score": sentiment_dict["score"],
-                        "sentiment_model": self.sentiment_model_name,
-                        "summarization_model": self.summarizer_model_name,
-                    }
-                )
-                return summarized_item
-            else:
-                raise ValueError("No summary output created")
+            summarized_item.update(
+                {
+                    "summary": news_summary,
+                    "sentiment_label": sentiment_dict["label"],
+                    "sentiment_score": sentiment_dict["score"],
+                    "sentiment_model": self.sentiment_model_name,
+                    "summarization_model": self.summarizer_model_name,
+                }
+            )
+            return summarized_item
         except (IndexError, ValueError) as err:
             log.warning("Error in running the models; err=%s", err)
             return summarized_item
         except RuntimeError as err:
-            if "CUDA" in str(err):
-                log.warning("Error with CUDA process for running models; err=%s", err)
-                return summarized_item
-            log.error("RuntimeError while running models; err=%s", err)
+            if "CUDA" not in str(err):
+                log.error("RuntimeError while running models; err=%s", err)
+            log.warning("Error with CUDA process for running models; err=%s", err)
+            return summarized_item
 
     def fetch_news_and_summarize(
         self,  # pylint: disable=too-many-locals

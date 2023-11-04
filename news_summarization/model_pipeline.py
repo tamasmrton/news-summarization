@@ -33,6 +33,33 @@ class ModelPipeline:
         self.model_name = model_name
         self.task = task
 
+    @staticmethod
+    def _find_middle(splitted_text: list) -> int:
+        """
+        Find the index of the middle element in a list.
+
+        :param splitted_text: A list of elements.
+        :type splitted_text: list
+        :return: The index of the middle element in the list. If the list has an even number of elements,
+                 this will be the index of the first element in the right half of the list.
+        """
+        length = len(splitted_text)
+        middle_index = length // 2
+        return middle_index
+
+    @staticmethod
+    def _count_tokens(model: pipeline, input_text: str) -> int:
+        """
+        Counts number of tokens in input text.
+
+        :param model: The pretrained model pipeline.
+        :param input_text: The text to count the tokens on.
+        :return: The number of tokens in the text.
+        """
+        log.info("Count number of tokens in text...")
+        tokens = len(model.tokenizer(input_text).input_ids)
+        return tokens
+
     def fetch_model(self, device: str = "cpu") -> pipeline:
         """
         Fetches the pretrained model pipeline.
@@ -49,6 +76,28 @@ class ModelPipeline:
         except (OSError, ValueError) as err:
             log.error("Unknown exception when fetching model; err=%s", err)
             return None
+
+    def split_input_text(self, model: pipeline, input_text: str) -> list:
+        """
+        Splits input text into two parts based on newline character.
+        Only does so when model token limit is reached.
+
+        :param model: The pretrained model pipeline.
+        :param input_text: The text to count the tokens on.
+        :return: List of input texts.
+        """
+        tokens = self._count_tokens(model, input_text)
+        max_tokens = model.tokenizer.model_max_length
+        if tokens > max_tokens:
+            log.info("Maximum allowed tokens reached; [%s > %s]", tokens, max_tokens)
+            log.info("Splitting text to smaller chunks...")
+            splitted_text = input_text.split("\n")
+            middle_index = self._find_middle(splitted_text)
+            first_part = splitted_text[:middle_index]
+            second_part = splitted_text[middle_index:]
+            return ["\n".join(first_part), "\n".join(second_part)]
+        log.info("Number of tokens in input is less than model capacity, continuing...")
+        return [input_text]
 
     def run_model(self, model: pipeline, input_text: str, **kwargs) -> dict:
         """
